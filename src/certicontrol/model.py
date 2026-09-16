@@ -140,3 +140,8 @@ class LTISystem:
     def has_exact_state_input_data(self) -> bool:
         """Whether A and B are available as exact rational matrices."""
         return self._A_exact is not None and self._B_exact is not None
+
+    @property
+    def has_exact_state_output_data(self) -> bool:
+        """Whether A and C are available as exact rational matrices."""
+        return self._A_exact is not None and self._C_exact is not None

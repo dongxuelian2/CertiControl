@@ -1,4 +1,4 @@
-"""Controllability certificates for continuous-time LTI systems."""
+"""Observability certificates for continuous-time LTI systems."""
 
 from __future__ import annotations
 
@@ -14,98 +14,116 @@ from .model import LTISystem, MatrixLike
 from .tolerance import TolerancePolicy, numerical_rank
 
 
-def _validate_ab_shapes(A: Any, B: Any) -> tuple[int, int]:
-    if len(A.shape) != 2 or len(B.shape) != 2:
-        raise ValueError("A and B must both be two-dimensional matrices.")
+def _validate_ac_shapes(A: Any, C: Any) -> tuple[int, int]:
+    if len(A.shape) != 2 or len(C.shape) != 2:
+        raise ValueError("A and C must both be two-dimensional matrices.")
     if A.shape[0] != A.shape[1]:
         raise ValueError(f"A must be square; got shape {A.shape}.")
-    if B.shape[0] != A.shape[0]:
+    if C.shape[1] != A.shape[0]:
         raise ValueError(
-            f"B must have {A.shape[0]} rows to match A; got shape {B.shape}."
+            f"C must have {A.shape[0]} columns to match A; got shape {C.shape}."
         )
-    return int(A.shape[0]), int(B.shape[1])
+    return int(A.shape[0]), int(C.shape[0])
 
 
-def controllability_matrix(A: MatrixLike, B: MatrixLike) -> np.ndarray | sp.Matrix:
-    """Return ``[B, AB, ..., A^(n-1)B]`` using a recurrence.
+def observability_matrix(A: MatrixLike, C: MatrixLike) -> np.ndarray | sp.Matrix:
+    """Return ``[C; CA; ...; CA^(n-1)]`` using a recurrence.
 
     SymPy input yields a SymPy matrix; otherwise a NumPy array is returned.
     """
-    if isinstance(A, sp.MatrixBase) or isinstance(B, sp.MatrixBase):
+    if isinstance(A, sp.MatrixBase) or isinstance(C, sp.MatrixBase):
         A_sp = sp.Matrix(A)
-        B_sp = sp.Matrix(B)
-        n, _ = _validate_ab_shapes(A_sp, B_sp)
-        blocks: list[sp.Matrix] = [B_sp]
-        current = B_sp
+        C_sp = sp.Matrix(C)
+        n, _ = _validate_ac_shapes(A_sp, C_sp)
+        blocks: list[sp.Matrix] = [C_sp]
+        current = C_sp
         for _ in range(1, n):
-            current = A_sp * current
+            current = current * A_sp
             blocks.append(current)
-        return sp.Matrix.hstack(*blocks)
+        return sp.Matrix.vstack(*blocks)
 
     A_np = np.asarray(A)
-    B_np = np.asarray(B)
-    n, _ = _validate_ab_shapes(A_np, B_np)
-    blocks_np: list[np.ndarray] = [B_np]
-    current_np = B_np
+    C_np = np.asarray(C)
+    n, _ = _validate_ac_shapes(A_np, C_np)
+    blocks_np: list[np.ndarray] = [C_np]
+    current_np = C_np
     for _ in range(1, n):
-        current_np = A_np @ current_np
+        current_np = current_np @ A_np
         blocks_np.append(current_np)
-    return np.hstack(blocks_np)
+    return np.vstack(blocks_np)
 
+
+def _require_output_matrix(system: LTISystem) -> np.ndarray:
+    if system.C is None:
+        raise ValueError("Observability analysis requires a C output matrix.")
+    return system.C
 
 
 def _exact_pbh(system: LTISystem) -> tuple[bool, list[dict[str, Any]], list[dict[str, Any]]]:
-    """Evaluate PBH exactly through left eigenspaces.
+    """Evaluate exact PBH failures through the exact unobservable subspace.
 
-    For a left eigenspace basis ``Q`` at lambda, PBH fails exactly when
-    ``B.T * Q`` has a non-trivial nullspace.  This avoids expensive symbolic
-    rank simplification of matrices containing algebraic eigenvalues.
+    A full-rank exact observability matrix immediately certifies that no PBH
+    failure exists, avoiding expensive symbolic eigendecompositions of all of
+    ``A``.  If an unobservable subspace exists, it is ``A``-invariant; we
+    restrict ``A`` to that smaller exact subspace, extract its eigenvectors,
+    and lift them back to state-space PBH witnesses.
     """
-    assert system.exact_A is not None and system.exact_B is not None
+    assert system.exact_A is not None and system.exact_C is not None
     A = sp.Matrix(system.exact_A)
-    B = sp.Matrix(system.exact_B)
+    C = sp.Matrix(system.exact_C)
+    obs = observability_matrix(A, C)
+    assert isinstance(obs, sp.MatrixBase)
+    nullspace = obs.nullspace()
+    if not nullspace:
+        return True, [], []
+
+    basis_matrix = sp.Matrix.hstack(*nullspace)
+    restricted_A, parameters = basis_matrix.gauss_jordan_solve(A * basis_matrix)
+    if parameters.rows != 0:
+        raise RuntimeError("Failed to obtain a unique restriction to the exact unobservable subspace.")
+
     modes: list[dict[str, Any]] = []
     failures: list[dict[str, Any]] = []
-
-    eigen_data = A.T.eigenvects(simplify=False, error_when_incomplete=False)
-    for eigenvalue, multiplicity, basis in eigen_data:
+    for eigenvalue, multiplicity, basis in restricted_A.eigenvects(
+        simplify=False, error_when_incomplete=False
+    ):
         if not basis:
             continue
-        eigenspace = sp.Matrix.hstack(*basis)
-        coupling = B.T * eigenspace
-        coupling_nullspace = coupling.nullspace()
-        failure_dimension = len(coupling_nullspace)
-        rank = system.n - failure_dimension
+        failure_dimension = len(basis)
         mode = {
             "eigenvalue": eigenvalue,
-            "algebraic_multiplicity": int(multiplicity),
-            "geometric_multiplicity": int(len(basis)),
-            "rank": int(rank),
+            "unobservable_algebraic_multiplicity": int(multiplicity),
+            "unobservable_geometric_multiplicity": int(failure_dimension),
+            "rank": int(system.n - failure_dimension),
         }
         modes.append(mode)
-        if coupling_nullspace:
-            coefficients = coupling_nullspace[0]
-            witness = eigenspace * coefficients
-            failure = dict(mode)
-            failure["witness"] = witness
-            failure["eigenvector_residual"] = sp.Integer(0)
-            failure["input_orthogonality_residual"] = sp.Integer(0)
-            failures.append(failure)
-    return not failures, modes, failures
+        witness = basis_matrix * basis[0]
+        eigen_error = (A * witness - eigenvalue * witness).applyfunc(sp.simplify)
+        output_error = (C * witness).applyfunc(sp.simplify)
+        if eigen_error != sp.zeros(system.n, 1) or output_error != sp.zeros(C.rows, 1):
+            raise RuntimeError("Exact unobservable-mode witness failed residual verification.")
+        failure = dict(mode)
+        failure["witness"] = witness
+        failure["eigenvector_residual"] = sp.Integer(0)
+        failure["output_null_residual"] = sp.Integer(0)
+        failures.append(failure)
+    if not failures:
+        raise RuntimeError("Nontrivial exact unobservable subspace produced no PBH witness.")
+    return False, modes, failures
 
 
 def _numerical_pbh(
     system: LTISystem, policy: TolerancePolicy
 ) -> tuple[bool, list[dict[str, Any]], list[dict[str, Any]]]:
+    C = _require_output_matrix(system)
     A = np.asarray(system.A)
-    B = np.asarray(system.B)
     identity = np.eye(system.n, dtype=np.result_type(A.dtype, np.complex128))
     eigenvalues = linalg.eigvals(A)
     modes: list[dict[str, Any]] = []
     failures: list[dict[str, Any]] = []
 
     for eigenvalue in eigenvalues:
-        pbh_matrix = np.hstack((eigenvalue * identity - A, B))
+        pbh_matrix = np.vstack((eigenvalue * identity - A, C))
         rank_result = numerical_rank(pbh_matrix, policy)
         mode = {
             "eigenvalue": complex(eigenvalue),
@@ -116,27 +134,28 @@ def _numerical_pbh(
         }
         modes.append(mode)
         if rank_result.rank < system.n:
-            left_vectors, _, _ = linalg.svd(pbh_matrix, full_matrices=True)
-            q = left_vectors[:, -1]
-            q = q / linalg.norm(q)
-            eigen_residual = float(linalg.norm(q.conj().T @ A - eigenvalue * q.conj().T))
-            input_residual = float(linalg.norm(q.conj().T @ B))
+            _, _, vh = linalg.svd(pbh_matrix, full_matrices=True)
+            v = vh.conj().T[:, -1]
+            v = v / linalg.norm(v)
+            eigen_residual = float(linalg.norm(A @ v - eigenvalue * v))
+            output_residual = float(linalg.norm(C @ v))
             failure = dict(mode)
             failure.update(
                 {
-                    "witness": q,
+                    "witness": v,
                     "eigenvector_residual": eigen_residual,
-                    "input_orthogonality_residual": input_residual,
+                    "output_null_residual": output_residual,
                 }
             )
             failures.append(failure)
     return not failures, modes, failures
 
 
-def pbh_controllability(
+def pbh_observability(
     system: LTISystem, tolerance_policy: TolerancePolicy | None = None
 ) -> Certificate:
-    """Evaluate the PBH controllability criterion with exact/numerical paths."""
+    """Evaluate the PBH observability criterion with exact/numerical paths."""
+    _require_output_matrix(system)
     policy = tolerance_policy or TolerancePolicy()
     numerical_passed, numerical_modes, numerical_failures = _numerical_pbh(system, policy)
     warnings: list[str] = []
@@ -144,19 +163,19 @@ def pbh_controllability(
     exact_passed: bool | None = None
     exact_modes: list[dict[str, Any]] | None = None
     exact_failures: list[dict[str, Any]] | None = None
-    if system.has_exact_state_input_data:
+    if system.has_exact_state_output_data:
         exact_passed, exact_modes, exact_failures = _exact_pbh(system)
         if exact_passed != numerical_passed:
             warnings.append(
-                "HIGH: Exact and numerical PBH classifications disagree; the floating-point "
+                "HIGH: Exact and numerical PBH observability classifications disagree; the floating-point "
                 "classification is tolerance-sensitive. The exact algebraic result is authoritative."
             )
 
     passed = exact_passed if exact_passed is not None else numerical_passed
     return Certificate(
-        name="PBH controllability",
+        name="PBH observability",
         passed=bool(passed),
-        verdict="controllable" if passed else "uncontrollable",
+        verdict="observable" if passed else "unobservable",
         evidence={
             "exact_modes": exact_modes,
             "exact_failures": exact_failures,
@@ -172,68 +191,71 @@ def pbh_controllability(
     )
 
 
-def analyze_controllability(
+def analyze_observability(
     system: LTISystem, tolerance_policy: TolerancePolicy | None = None
 ) -> Certificate:
-    """Build a controllability certificate and cross-check it with PBH."""
+    """Build an observability certificate and cross-check it with PBH."""
+    C = _require_output_matrix(system)
     policy = tolerance_policy or TolerancePolicy()
-    numeric_matrix = np.asarray(controllability_matrix(system.A, system.B))
+    numeric_matrix = np.asarray(observability_matrix(system.A, C))
     numeric_rank = numerical_rank(numeric_matrix, policy)
     numerical_pivots = numerical_pivot_columns(numeric_matrix, numeric_rank.rank)
     warnings: list[str] = []
 
-    sensitivity = rank_sensitivity_warning(numeric_rank, matrix_name="controllability matrix")
+    sensitivity = rank_sensitivity_warning(numeric_rank, matrix_name="observability matrix")
     if sensitivity:
         warnings.append(sensitivity)
 
     exact_matrix: sp.Matrix | None = None
     exact_rank: int | None = None
     exact_pivots: tuple[int, ...] | None = None
-    if system.has_exact_state_input_data:
-        assert system.exact_A is not None and system.exact_B is not None
-        exact_matrix = controllability_matrix(system.exact_A, system.exact_B)
+    if system.has_exact_state_output_data:
+        assert system.exact_A is not None and system.exact_C is not None
+        exact_matrix = observability_matrix(system.exact_A, system.exact_C)
         assert isinstance(exact_matrix, sp.MatrixBase)
         exact_rank, exact_pivots = exact_rank_and_pivots(exact_matrix)
         if exact_rank != numeric_rank.rank:
             warnings.append(
-                "HIGH: Exact controllability rank and numerical rank disagree; the floating-point "
+                "HIGH: Exact observability rank and numerical rank disagree; the floating-point "
                 "classification is tolerance-sensitive. The exact algebraic rank is authoritative."
             )
 
     matrix_exact_passed = None if exact_rank is None else exact_rank == system.n
     matrix_numerical_passed = numeric_rank.rank == system.n
-    pbh = pbh_controllability(system, policy)
+    pbh = pbh_observability(system, policy)
     pbh_exact_passed = pbh.diagnostics["exact_passed"]
     pbh_numerical_passed = pbh.diagnostics["numerical_passed"]
 
     if matrix_exact_passed is not None and pbh_exact_passed is not None:
         if matrix_exact_passed != pbh_exact_passed:
-            warnings.append(
-                "HIGH: Controllability-matrix and PBH exact criteria disagree. This indicates an internal inconsistency."
+            raise RuntimeError(
+                "Exact observability-matrix and PBH criteria disagree; this indicates an implementation error."
             )
     if matrix_numerical_passed != pbh_numerical_passed:
         warnings.append(
-            "HIGH: Controllability-matrix and PBH numerical criteria disagree under the active tolerance."
+            "HIGH: Observability-matrix and PBH numerical criteria disagree under the active tolerance."
         )
     warnings.extend(pbh.warnings)
 
     passed = matrix_exact_passed if matrix_exact_passed is not None else matrix_numerical_passed
+    smallest = float(numeric_rank.singular_values[-1]) if numeric_rank.singular_values.size else 0.0
     return Certificate(
-        name="Controllability",
+        name="Observability",
         passed=bool(passed),
-        verdict="controllable" if passed else "uncontrollable",
+        verdict="observable" if passed else "unobservable",
         evidence={
-            "controllability_matrix": numeric_matrix,
-            "controllability_matrix_exact": exact_matrix,
+            "observability_matrix": numeric_matrix,
+            "observability_matrix_exact": exact_matrix,
             "pivot_columns": exact_pivots if exact_pivots is not None else numerical_pivots,
             "pbh": pbh,
         },
         diagnostics={
             "n": system.n,
-            "m": system.m,
+            "p": system.p,
             "exact_rank": exact_rank,
             "numerical_rank": numeric_rank.rank,
             "singular_values": numeric_rank.singular_values,
+            "smallest_singular_value": smallest,
             "tolerance": numeric_rank.tolerance,
             "condition_number": numeric_rank.condition_number,
             "numerical_pivot_columns": numerical_pivots,
