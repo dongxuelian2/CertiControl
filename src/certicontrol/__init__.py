@@ -2,6 +2,7 @@
 
 from .certificates import Certificate
 from .controllability import analyze_controllability, controllability_matrix, pbh_controllability
+from .decomposition import analyze_kalman_decomposition, analyze_observability_decomposition, analyze_reachability_decomposition, reachable_subspace, unobservable_subspace
 from .lyapunov import LyapunovSolution, analyze_lyapunov_stability, solve_lyapunov
 from .lqr import CARESolution, analyze_detectability, analyze_lqr, analyze_stabilizability, solve_care
 from .model import LTISystem
@@ -20,6 +21,9 @@ __all__ = [
     "analyze_controllability",
     "analyze_detectability",
     "analyze_lqr",
+    "analyze_kalman_decomposition",
+    "analyze_observability_decomposition",
+    "analyze_reachability_decomposition",
     "analyze_observability",
     "analyze_lyapunov_stability",
     "analyze_spectral_stability",
@@ -31,6 +35,8 @@ __all__ = [
     "parse_matrix",
     "pbh_controllability",
     "pbh_observability",
+    "reachable_subspace",
     "solve_care",
     "solve_lyapunov",
+    "unobservable_subspace",
 ]

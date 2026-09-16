@@ -4,7 +4,7 @@ CertiControl is a certificate-based analysis toolkit for continuous-time finite-
 
 ## Current scope
 
-CertiControl currently implements controllability, observability, continuous-time Hurwitz/Lyapunov, and continuous-time infinite-horizon LQR/CARE certificate slices.
+CertiControl currently implements controllability, observability, continuous-time Hurwitz/Lyapunov, continuous-time infinite-horizon LQR/CARE, and Kalman structural-decomposition certificate slices.
 
 ### Controllability
 
@@ -27,7 +27,7 @@ CertiControl currently implements controllability, observability, continuous-tim
 - exact or residual-bearing witnesses for unobservable modes;
 - controllability--observability duality and similarity-invariance tests.
 
-Discrete-time LQR, finite-horizon control, LQG/Kalman filtering, decomposition, frequency-domain analysis, and UI work remain intentionally outside the current scope.
+Discrete-time LQR, finite-horizon control, LQG/Kalman filtering, minimal-realization products, frequency-domain analysis, and UI work remain intentionally outside the current scope.
 
 ## Install
 
@@ -139,6 +139,29 @@ A_cl^T P + P A_cl + Q + K^T R K = 0,
 ```
 
 rather than treating a successful SciPy CARE return as sufficient evidence.
+
+## Kalman Structural Decomposition
+
+The structural-decomposition slice combines reachability and observability inside one state space. Here “Kalman decomposition” means the structural decomposition of a linear realization, not Kalman filtering.
+
+```python
+from certicontrol import LTISystem, analyze_kalman_decomposition
+
+system = LTISystem(
+    A=[[-1, 0, 1, 0], [0, -2, 0, 0], [0, 0, -3, 0], [0, 0, 0, -4]],
+    B=[[1], [1], [0], [0]],
+    C=[[1, 0, 1, 0]],
+)
+certificate = analyze_kalman_decomposition(system)
+
+print(certificate.diagnostics["reachable_dimension"])
+print(certificate.diagnostics["unobservable_dimension"])
+print(certificate.diagnostics["controllable_observable_dimension"])
+print(certificate.evidence["T"])              # x = T z
+print(certificate.evidence["A_transformed"])
+```
+
+CertiControl verifies not only the four structural dimensions but also the invariant-subspace relations, the similarity equations, and the zero-block pattern predicted by Kalman decomposition. The canonical information is the reachable subspace, the unobservable subspace, their intersection, and the resulting dimensions; complement bases and the particular transformation `T` are generally non-unique. Previous phases certify control-theoretic properties individually; this phase explains how controllability and observability coexist inside the same state space.
 
 ## What "certificate" means here
 
