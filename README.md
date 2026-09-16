@@ -4,7 +4,7 @@ CertiControl is a certificate-based analysis toolkit for continuous-time finite-
 
 ## Current scope
 
-CertiControl currently implements controllability, observability, and continuous-time Hurwitz/Lyapunov certificate slices.
+CertiControl currently implements controllability, observability, continuous-time Hurwitz/Lyapunov, and continuous-time infinite-horizon LQR/CARE certificate slices.
 
 ### Controllability
 
@@ -27,7 +27,7 @@ CertiControl currently implements controllability, observability, and continuous
 - exact or residual-bearing witnesses for unobservable modes;
 - controllability--observability duality and similarity-invariance tests.
 
-LQR, Riccati equations, decomposition, discrete-time analysis, and UI work remain intentionally outside the current scope.
+Discrete-time LQR, finite-horizon control, LQG/Kalman filtering, decomposition, frequency-domain analysis, and UI work remain intentionally outside the current scope.
 
 ## Install
 
@@ -109,6 +109,36 @@ print(lyapunov.evidence["P_exact"])              # exact rational P when availab
 ```
 
 With the default `Q = I`, the Lyapunov evidence checks `A^T P + P A = -Q` for real systems (or `A^* P + P A = -Q` for complex systems), verifies positive definiteness, and records residuals and exact leading principal minors when rational data are available. Boundary eigenvalues near the imaginary axis are reported as tolerance-sensitive rather than being mislabeled as asymptotically stable.
+
+## Continuous-Time LQR
+
+The LQR slice validates `Q >= 0`, `R > 0`, stabilizability, and detectability before accepting a CARE solution. Detectability uses `Q` as a kernel-equivalent output map because a PSD matrix and `Q^(1/2)` have the same nullspace.
+
+```python
+import numpy as np
+from certicontrol import LTISystem, analyze_lqr
+
+system = LTISystem(
+    A=[[0, 1], [-2, -3]],
+    B=[[0], [1]],
+)
+certificate = analyze_lqr(system, Q=np.eye(2), R=[[1]])
+
+print(certificate.verdict)
+print(certificate.evidence["P"])
+print(certificate.evidence["K"])
+print(certificate.diagnostics["care_relative_residual"])
+print(certificate.diagnostics["closed_loop_eigenvalues"])
+print(certificate.diagnostics["closed_loop_hurwitz_status"])
+```
+
+For a valid stabilizing solution, `u = -Kx` and `V(x) = x^T P x` is the optimal cost-to-go. CertiControl independently checks both the CARE and the closed-loop identity
+
+```text
+A_cl^T P + P A_cl + Q + K^T R K = 0,
+```
+
+rather than treating a successful SciPy CARE return as sufficient evidence.
 
 ## What "certificate" means here
 

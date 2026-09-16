@@ -104,6 +104,87 @@ def numerical_positive_definite(
     )
 
 
+
+@dataclass(frozen=True)
+class NumericalPositiveSemidefiniteResult:
+    """Hermitian eigenvalue diagnostics for a positive-semidefiniteness decision."""
+
+    eigenvalues: np.ndarray
+    lambda_min: float
+    tolerance: float
+    verdict: bool | None
+    classification: str
+
+
+def numerical_positive_semidefinite(
+    matrix: np.ndarray,
+    policy: TolerancePolicy | None = None,
+) -> NumericalPositiveSemidefiniteResult:
+    """Classify a Hermitian matrix as PSD, indefinite, or tolerance-sensitive.
+
+    A nonnegative eigenvalue that is smaller than the active tolerance is
+    accepted as semidefinite rather than positive definite. A slightly
+    negative eigenvalue within tolerance is reported as inconclusive instead
+    of silently projecting the matrix onto the PSD cone.
+    """
+    policy = policy or TolerancePolicy()
+    array = np.asarray(matrix)
+    if array.ndim != 2 or array.shape[0] != array.shape[1]:
+        raise ValueError(f"positive-semidefiniteness input must be square; got shape {array.shape}.")
+    eigenvalues = linalg.eigvalsh(array)
+    lambda_min = float(np.real(eigenvalues[0])) if eigenvalues.size else float("nan")
+    scales = np.sort(np.abs(eigenvalues))[::-1]
+    tolerance = policy.threshold(scales, array.shape)
+    if lambda_min > tolerance:
+        verdict: bool | None = True
+        classification = "POSITIVE_DEFINITE"
+    elif lambda_min >= 0.0:
+        verdict = True
+        classification = "POSITIVE_SEMIDEFINITE"
+    elif lambda_min >= -tolerance:
+        verdict = None
+        classification = "TOLERANCE_SENSITIVE"
+    else:
+        verdict = False
+        classification = "INDEFINITE"
+    return NumericalPositiveSemidefiniteResult(
+        eigenvalues=eigenvalues,
+        lambda_min=lambda_min,
+        tolerance=tolerance,
+        verdict=verdict,
+        classification=classification,
+    )
+
+
+def exact_positive_semidefinite(
+    matrix: sp.MatrixBase,
+) -> tuple[bool | None, tuple[tuple[tuple[int, ...], sp.Expr], ...]]:
+    """Check PSD exactly via all principal minors for exact Hermitian data.
+
+    A Hermitian matrix is positive semidefinite iff every principal minor is
+    nonnegative. This is deliberately different from the leading-principal-
+    minor Sylvester criterion used for strict positive definiteness.
+    """
+    from itertools import combinations
+
+    mat = sp.Matrix(matrix)
+    if mat.rows != mat.cols:
+        raise ValueError(f"positive-semidefiniteness input must be square; got shape {mat.shape}.")
+    if mat != mat.conjugate().T:
+        return False, ()
+
+    evidence: list[tuple[tuple[int, ...], sp.Expr]] = []
+    unknown = False
+    for size in range(1, mat.rows + 1):
+        for indices in combinations(range(mat.rows), size):
+            minor = sp.simplify(mat.extract(indices, indices).det())
+            evidence.append((tuple(int(index) for index in indices), minor))
+            if minor.is_negative is True:
+                return False, tuple(evidence)
+            if minor.is_nonnegative is not True:
+                unknown = True
+    return (None if unknown else True), tuple(evidence)
+
 def exact_positive_definite(matrix: sp.MatrixBase) -> tuple[bool, tuple[sp.Expr, ...]]:
     """Apply Sylvester's criterion and return all exact leading principal minors."""
     mat = sp.Matrix(matrix)
