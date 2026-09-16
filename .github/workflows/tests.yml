@@ -16,5 +16,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: python -m pip install --upgrade pip
-      - run: python -m pip install -e ".[test]"
+      - run: python -m pip install -e ".[test,app]"
+      - run: python -m compileall -q src app.py app_helpers.py
+      - run: python -c "import certicontrol; import app"
       - run: pytest -q
