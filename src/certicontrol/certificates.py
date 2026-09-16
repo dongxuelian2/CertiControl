@@ -38,7 +38,7 @@ class Certificate:
     """Machine-readable result with evidence, diagnostics, and warnings."""
 
     name: str
-    passed: bool
+    passed: bool | None
     verdict: str
     evidence: dict[str, Any] = field(default_factory=dict)
     diagnostics: dict[str, Any] = field(default_factory=dict)

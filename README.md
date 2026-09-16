@@ -4,7 +4,7 @@ CertiControl is a certificate-based analysis toolkit for continuous-time finite-
 
 ## Current scope
 
-CertiControl currently implements complete controllability and observability certificate slices.
+CertiControl currently implements controllability, observability, and continuous-time Hurwitz/Lyapunov certificate slices.
 
 ### Controllability
 
@@ -27,7 +27,7 @@ CertiControl currently implements complete controllability and observability cer
 - exact or residual-bearing witnesses for unobservable modes;
 - controllability--observability duality and similarity-invariance tests.
 
-Lyapunov analysis, stability, LQR, decomposition, and UI work remain intentionally outside the current scope.
+LQR, Riccati equations, decomposition, discrete-time analysis, and UI work remain intentionally outside the current scope.
 
 ## Install
 
@@ -83,6 +83,32 @@ print(certificate.diagnostics["exact_rank"])    # 1
 print(certificate.diagnostics["pbh_exact_passed"])  # False
 print(certificate.evidence["pbh"].evidence["exact_failures"])  # witness data
 ```
+
+## Stability and Lyapunov Certificates
+
+For finite-dimensional continuous-time LTI systems, Hurwitz stability is equivalent to asymptotic/exponential stability. CertiControl reports both spectral evidence and a checkable Lyapunov certificate rather than only a Boolean.
+
+```python
+from certicontrol import LTISystem, analyze_stability
+
+system = LTISystem(
+    A=[[0, 1], [-2, -3]],
+    B=[[0], [1]],
+)
+certificate = analyze_stability(system)
+
+spectral = certificate.evidence["spectral"]
+lyapunov = certificate.evidence["lyapunov"]
+
+print(spectral.diagnostics["spectral_abscissa"])  # -1.0
+print(certificate.verdict)                         # HURWITZ
+print(lyapunov.evidence["P"])                    # numerical P
+print(lyapunov.diagnostics["lambda_min_P"])
+print(lyapunov.diagnostics["relative_residual"])
+print(lyapunov.evidence["P_exact"])              # exact rational P when available
+```
+
+With the default `Q = I`, the Lyapunov evidence checks `A^T P + P A = -Q` for real systems (or `A^* P + P A = -Q` for complex systems), verifies positive definiteness, and records residuals and exact leading principal minors when rational data are available. Boundary eigenvalues near the imaginary axis are reported as tolerance-sensitive rather than being mislabeled as asymptotically stable.
 
 ## What "certificate" means here
 
