@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from certicontrol import AnalysisOptions, TolerancePolicy, analyze_system
+from certicontrol import TolerancePolicy, analyze_system
 from certicontrol.examples import curated_examples, get_example
 from certicontrol.reporting import to_json, to_markdown
 
@@ -145,7 +145,7 @@ def test_export_smoke_writes_readable_markdown_and_parseable_json(tmp_path):
 
     markdown = markdown_path.read_text(encoding="utf-8")
     payload = json.loads(json_path.read_text(encoding="utf-8"))
-    assert "## Structural Decomposition" in markdown
+    assert "## Kalman Structural Decomposition" in markdown
     assert payload["analyses"]["kalman"]["status"] == "PASS"
     assert "1/3" in json_path.read_text(encoding="utf-8")
 
