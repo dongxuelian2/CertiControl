@@ -1,33 +1,58 @@
 # CertiControl
 
-CertiControl is a certificate-based toolkit for continuous-time LTI systems that exposes the mathematical evidence behind controllability, observability, stability, LQR synthesis, and Kalman structural decomposition.
+**Inspect the evidence behind linear control analysis.**
 
-It is designed for small teaching and analysis problems where a Boolean answer is not enough: certificates retain exact algebraic evidence when available, numerical residuals and margins, PBH witnesses, active tolerances, cross-checks, and structural transformations.
+[![tests](https://github.com/dongxuelian2/CertiControl/actions/workflows/tests.yml/badge.svg)](https://github.com/dongxuelian2/CertiControl/actions/workflows/tests.yml)
 
-## Why CertiControl
+CertiControl is a certificate-based toolkit for continuous-time finite-dimensional LTI systems. It exposes the mathematical evidence behind controllability, observability, stability, LQR synthesis, and Kalman structural decomposition instead of returning only final Boolean or matrix-valued answers.
 
-Typical control software can tell you that a system is controllable, stable, or has an LQR gain. CertiControl is built around a different question:
+**Repository:** https://github.com/dongxuelian2/CertiControl  
+**Interactive app:** run locally with `streamlit run app.py`  
+**Release candidate:** `0.2.0`
 
-> **What evidence can be inspected to justify that conclusion?**
+> Screenshots are intentionally not embedded until they are captured from a real running app. The capture plan is tracked in [`docs/SUBMISSION_CHECKLIST.md`](docs/SUBMISSION_CHECKLIST.md).
 
-The package therefore keeps the intermediate mathematical objects that matter: controllability/observability matrices, exact ranks, singular values, PBH failure modes, Lyapunov matrices, CARE residuals, closed-loop identities, invariant subspaces, and Kalman-coordinate zero patterns.
+## Why CertiControl?
 
-## Features
+Classical control software is excellent at computation, but many workflows expose only the final numerical result. A result such as `Controllable: True` does not show why the criterion passed, which mode failed when it did not, or whether the conclusion is sensitive to floating-point tolerance.
 
-- **Exact + numerical dual paths** for rational state-space data where the mathematics supports exact computation.
-- **Controllability and observability certificates** with matrix-rank and PBH cross-checks.
-- **Failure witnesses** for uncontrollable and unobservable modes.
-- **Continuous-time Hurwitz analysis** with spectral abscissa, margins, and boundary-aware classification.
-- **Lyapunov certificates** with exact rational solves, positive-definiteness evidence, and equation residuals.
-- **Continuous-time infinite-horizon LQR / CARE** with Q/R validation, stabilizability, detectability, independently verified CARE residuals, and a closed-loop Riccati/Lyapunov identity.
-- **Kalman structural decomposition** with reachable/unobservable subspaces, their intersection, exact structural zeros, transformation residuals, and conditioning diagnostics.
-- **Unified analysis sessions** that isolate unavailable or failed modules instead of discarding successful certificates.
-- **Exportable Markdown and JSON reports**.
-- **Offline Streamlit application** with curated examples and pole visualizations.
+CertiControl turns familiar control-theory criteria into inspectable computational certificates:
 
-## Quick Start
+- **evidence** — matrices, ranks, singular values, transformed systems;
+- **witnesses** — explicit PBH failure modes for uncontrollability and unobservability;
+- **residuals** — independently evaluated Lyapunov, CARE, gain, covariance, and structural identities;
+- **margins** — spectral and positivity diagnostics;
+- **cross-checks** — exact versus numerical paths and equivalent criteria;
+- **uncertainty** — tolerance-sensitive cases remain visible as warnings or inconclusive results.
 
-Clone the repository and install the interactive-app extra:
+The project does not claim new control theory. Its contribution is a certificate-first way to expose classical control theory computationally.
+
+## What it certifies
+
+| Analysis | Inspectable evidence |
+| --- | --- |
+| Controllability | controllability matrix, exact/numerical rank, SVD diagnostics, PBH cross-check, failure witness |
+| Observability | observability matrix, exact/numerical rank, PBH cross-check, failure witness, duality |
+| Stability / Lyapunov | spectral abscissa and margin, exact/numerical Lyapunov solution, positivity evidence, residual |
+| LQR / CARE | Q/R validation, stabilizability, detectability, P, K, CARE residual, closed-loop Hurwitz check, closed-loop identity |
+| Kalman decomposition | reachable and unobservable subspaces, intersection, four structural dimensions, transformation, zero-block residuals |
+
+The unified analysis layer also exposes explicit `PASS`, `FAIL`, `INCONCLUSIVE`, `NOT_RUN`, and `ERROR` states rather than conflating missing input with failure.
+
+## Interactive demo
+
+The Streamlit app provides seven deterministic examples and tabs for Overview, Controllability, Observability, Stability, LQR, Kalman Structure, and Export.
+
+Recommended hackathon demo path:
+
+1. **Four-part Kalman structure** — shows `co = cu = uo = uu = 1` and the verified structural transformation.
+2. **Uncontrollable mode** — shows an explicit PBH failure witness.
+3. **Unstable but controllable** — compares open-loop and LQR closed-loop poles.
+4. **Tolerance-sensitive** — shows that CertiControl does not hide numerical ambiguity.
+
+The application is offline: it does not require an API key, cloud model, remote database, or AI service.
+
+## Quick start
 
 ```bash
 git clone https://github.com/dongxuelian2/CertiControl.git
@@ -36,201 +61,163 @@ python -m pip install -e ".[app]"
 streamlit run app.py
 ```
 
-For library-only use, the core dependencies remain NumPy, SciPy, and SymPy:
-
-```bash
-python -m pip install -e .
-```
-
-For development:
+For development and tests:
 
 ```bash
 python -m pip install -e ".[test,app]"
 pytest -q
 ```
 
-## Interactive App
+A Streamlit Community Cloud-compatible `requirements.txt` is also included at the repository root.
 
-The Streamlit app requires no network service and no cloud backend. It provides:
-
-- text input for `A`, `B`, optional `C`, and optional `D` using the same safe parser as the Python library;
-- exact rational input such as `1/2` without pre-converting it to floating point;
-- automatic or custom numerical rank tolerance;
-- a seven-system curated example selector;
-- Overview, Controllability, Observability, Stability, LQR, Kalman Structure, and Export tabs;
-- PBH failure witnesses;
-- open-loop pole plots and LQR open-vs-closed-loop pole plots;
-- Kalman four-part structural dimensions and transformed matrices;
-- downloadable Markdown and JSON certificates.
-
-A useful demo path is **Four-part Kalman structure**, which gives
-
-```text
-Controllable / Observable       1
-Controllable / Unobservable     1
-Uncontrollable / Observable     1
-Uncontrollable / Unobservable   1
-```
-
-The **Unstable but controllable** example provides a separate LQR demo in which the open-loop system is not Hurwitz but the certified LQR closed loop is Hurwitz.
-
-## Python API Example
+## Python API example
 
 ```python
-from certicontrol import (
-    AnalysisOptions,
-    LTISystem,
-    analyze_system,
-    to_markdown,
-)
+import sympy as sp
+
+from certicontrol import LTISystem, analyze_system
 
 system = LTISystem(
-    A=[[0, 1], [-2, -3]],
-    B=[[0], [1]],
+    [[0, 1], [-2, -3]],
+    [[0], [1]],
     C=[[1, 0]],
     D=[[0]],
 )
 
-analysis = analyze_system(
-    system,
-    Q=[[1, 0], [0, 1]],
-    R=[[1]],
-    options=AnalysisOptions(run_kalman=True, run_lqr=True),
-)
+analysis = analyze_system(system, Q=sp.eye(2), R=sp.Matrix([[1]]))
 
 print(analysis.summary())
-print(to_markdown(analysis))
+print(analysis.certificates["controllability"].diagnostics["exact_rank"])
 ```
 
-If `C` is omitted, controllability and stability can still run; observability and full Kalman decomposition are explicitly reported as `NOT_RUN`. Likewise, LQR is `NOT_RUN` until both Q and R are supplied.
+Reports can be exported as Markdown or JSON through either the Streamlit app or `certicontrol.reporting`.
 
-## Certificates
+## Mathematical certificates
 
 ### Controllability
 
-CertiControl computes
+For
+
+\[
+\dot x = Ax + Bu,
+\]
+
+CertiControl forms
 
 \[
 \mathcal C=[B,AB,\ldots,A^{n-1}B]
 \]
 
-with exact rank/RREF data when rational input is available, SVD rank diagnostics otherwise, and an independent PBH check. If PBH fails, the certificate retains an offending left-eigenvector witness satisfying
-
-\[
-q^T A=\lambda q^T,\qquad q^T B=0
-\]
-
-(or the conjugate-transpose form for complex numerical data), together with residuals.
+and cross-checks matrix rank against the PBH criterion. When controllability fails, the certificate can expose a left-eigenvector witness satisfying the expected eigenvector and input-orthogonality relations, together with residuals.
 
 ### Observability
 
-The observability certificate uses
+The observability matrix
 
 \[
 \mathcal O=\begin{bmatrix}C\\CA\\\vdots\\CA^{n-1}\end{bmatrix}
 \]
 
-plus PBH observability. Failure evidence includes an unobservable right-eigenvector satisfying
+is checked with exact/numerical rank and PBH observability. Failure certificates can expose an unobservable right-eigenvector witness.
+
+### Stability & Lyapunov
+
+Spectral analysis reports the spectral abscissa, stability tolerance, margin, and dominant modes. For Lyapunov analysis, CertiControl independently verifies
 
 \[
-Av=\lambda v,\qquad Cv=0.
+A^T P + PA = -Q
 \]
 
-### Stability / Lyapunov
-
-Spectral analysis reports the continuous-time spectral abscissa and a three-state Hurwitz classification. The Lyapunov path checks
-
-\[
-A^*P+PA=-Q
-\]
-
-including symmetry/Hermitian residuals, positive-definiteness evidence, and exact zero residuals for supported rational systems. Imaginary-axis and tolerance-sensitive cases are not silently promoted to PASS.
+(or the Hermitian analogue) and checks the positivity assumptions used by the certificate. Exact rational inputs can produce exact zero-residual evidence where supported.
 
 ### LQR / CARE
 
-For
+Continuous-time infinite-horizon state-feedback LQR verifies its prerequisites before accepting a solver result. It checks Q positive semidefinite, R positive definite, stabilizability, detectability, CARE residuals, gain consistency, and closed-loop Hurwitz stability.
+
+It also independently evaluates
 
 \[
-J=\int_0^\infty(x^*Qx+u^*Ru)\,dt,
+A_{cl}^T P + PA_{cl} + Q + K^T R K = 0,
 \]
 
-CertiControl validates `Q \succeq 0`, `R \succ 0`, stabilizability, and detectability before accepting a CARE solution. It then verifies
+so a returned gain is not treated as a certificate by itself.
 
-\[
-A^*P+PA-PBR^{-1}B^*P+Q=0
-\]
+### Kalman decomposition
 
-without explicitly forming `R^{-1}`, computes `u=-Kx`, checks the closed-loop poles, and independently verifies
+CertiControl computes the reachable subspace \(\mathcal R\), unobservable subspace \(\mathcal N\), and \(\mathcal R\cap\mathcal N\), then constructs a similarity transformation organized as
 
-\[
-A_{cl}^*P+PA_{cl}+Q+K^*RK=0.
-\]
-
-A successful SciPy CARE return alone is therefore not treated as a certificate.
-
-### Kalman Structural Decomposition
-
-The structural phase computes the canonical subspaces
-
-\[
-\mathcal R=\operatorname{im}\mathcal C,\qquad
-\mathcal N=\ker\mathcal O,\qquad
-\mathcal R\cap\mathcal N,
-\]
-
-and constructs a non-unique coordinate transformation
-
-\[
-x=Tz
-\]
-
-ordered as controllable/observable, controllable/unobservable, uncontrollable/observable, uncontrollable/unobservable. CertiControl verifies the invariant-subspace relations, similarity equations, input/output support, and only those transformed zero blocks that Kalman decomposition actually requires. The particular complement bases and `T` are generally non-canonical; the subspaces and dimensions are the structural invariants.
-
-## Reports
-
-`SystemAnalysis` can be exported without rerunning any mathematical analysis:
-
-```python
-from certicontrol import to_json, to_markdown
-
-markdown_text = to_markdown(analysis)
-json_text = to_json(analysis, indent=2)
+```text
+                     Observable   Unobservable
+Controllable             co            cu
+Uncontrollable           uo            uu
 ```
 
-Reports include system matrices, CertiControl version, timestamp, active tolerance policy, analyses performed, nested certificate evidence, machine-readable warning codes, and human-readable warnings.
+The particular complement bases are non-unique; the canonical structural information is the subspaces and dimensions. The certificate verifies invariance relations, transformation equations, conditioning, and only the zero blocks required by Kalman structure.
+
+## Exact + numerical verification
+
+When the input contains exact integers or rationals, CertiControl preserves a SymPy exact path wherever the implemented mathematics supports one. Numerical NumPy/SciPy calculations remain available as diagnostics and cross-checks.
+
+This distinction matters: an exact algebraic rank and a tolerance-sensitive numerical rank are not presented as equally strong statements. The UI and reports preserve warnings rather than silently rounding ambiguity away.
 
 ## Testing
 
-The GitHub Actions workflow tests Python 3.10 and Python 3.13. The suite includes the mathematical regression tests from Phases 1–5 plus reporting, unified-analysis, curated-example, visualization-helper, JSON roundtrip, partial-input, and app-import smoke tests.
+The automated suite covers more than isolated unit functions. It includes:
 
-## Mathematical Scope
+- textbook and analytic fixtures;
+- exact/numerical cross-checks;
+- PBH equivalence and witnesses;
+- controllability/observability duality;
+- similarity invariance;
+- Lyapunov covariance;
+- LQR covariance and independent residual checks;
+- Kalman structural invariance and duality;
+- reporting/JSON integration;
+- curated-example smoke tests;
+- Streamlit import and startup checks.
 
-Current scope:
+GitHub Actions runs on Python 3.10 and 3.13.
 
-- continuous-time;
-- finite-dimensional LTI state-space systems;
-- typically `n <= 10` for interactive numerical work;
-- exact rational paths where explicitly supported by a certificate module.
+## Project architecture
 
-Not currently implemented:
+```text
+Streamlit UI
+    ↓
+Unified analysis / reporting
+    ↓
+Certificate objects
+    ↓
+Control-theory modules
+    ↓
+Exact SymPy + numerical NumPy/SciPy
+```
 
-- discrete-time systems;
-- transfer functions and frequency-domain analysis;
-- minimal realization products or model reduction;
-- pole placement or observer synthesis;
-- Kalman filtering / LQG;
-- MPC, H2, H-infinity, or robust-control synthesis;
-- time-domain simulation UI;
-- formal proof export.
+The `certicontrol` package does not import Streamlit. The UI is a presentation layer over the public analysis API.
 
-**Kalman decomposition** in this project means the structural decomposition of a linear realization, not Kalman filtering.
+## Scope and limitations
 
-## Certificate Semantics and Limitations
+Current mathematical scope:
 
-`PASS`, `FAIL`, and `INCONCLUSIVE` retain the tri-state semantics of the mathematical certificates; an analysis omitted because required input is missing is `NOT_RUN`. Numerical rank, subspace, stability, and conditioning conclusions remain tolerance-dependent, and ill-conditioned transformations are reported rather than hidden.
+- continuous-time, finite-dimensional LTI systems;
+- small teaching/analysis models, typically `n <= 10`;
+- exact rational evidence where explicitly implemented;
+- numerical certificates elsewhere.
 
-CertiControl certificates are **inspectable computational evidence**. They are not formal proofs or safety-critical engineering certification.
+Not currently implemented: discrete-time systems, minimal realization, transfer functions, pole placement, observer synthesis, Kalman filtering, LQG, MPC, frequency-domain plots, balanced truncation, or nonlinear control.
+
+CertiControl certificates are inspectable computational evidence. They are **not** formal proofs or safety-critical engineering certification.
+
+## Hackathon
+
+This repository is being packaged as a submission candidate for **InfinityX Global Hackathon 2K26**. The hackathon package lives in [`docs/`](docs/) and includes:
+
+- [`DEVPOST_SUBMISSION.md`](docs/DEVPOST_SUBMISSION.md) — copy-ready submission draft;
+- [`DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md) — 90–120 second recording plan and English voiceover;
+- [`SUBMISSION_CHECKLIST.md`](docs/SUBMISSION_CHECKLIST.md) — automated versus human submission tasks;
+- [`RESUME_BULLETS.md`](docs/RESUME_BULLETS.md) — reusable portfolio descriptions.
+
+The runtime product itself does not depend on AI services. NumPy, SciPy, and SymPy provide the numerical/symbolic primitives; Streamlit and Plotly provide the interactive presentation layer.
 
 ## License
 
-MIT. See `LICENSE`.
+MIT — see [`LICENSE`](LICENSE).
