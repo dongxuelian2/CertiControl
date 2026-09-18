@@ -2,13 +2,13 @@
 
 This directory contains **real screenshots captured from the running CertiControl Streamlit application**.
 
-Repository-optimized assets:
+Current assets:
 
-- `overview.webp` — Overview/status screen using the four-part Kalman example.
-- `lqr.webp` — LQR certificate and open/closed-loop pole comparison.
-- `kalman.webp` — four-part Kalman structural decomposition.
-- `stability.png` — optional future/Devpost stability capture if a full-resolution copy is committed later.
+- `overview.png` — full-resolution Overview/status screen using the four-part Kalman example.
+- `lqr.png` — full-resolution LQR certificate and open/closed-loop pole comparison.
+- `kalman.png` — full-resolution four-part Kalman structural decomposition.
+- `stability.png` — optional future/Devpost stability capture if committed later.
 
-The WebP files are resized/compressed copies of the real browser captures for faster README rendering. Do not commit generated UI mockups as if they were screenshots of the real application.
+The PNG files are direct browser screenshots of the real Streamlit UI. Do not commit generated UI mockups as if they were screenshots of the real application.
 
-For Devpost or other presentation surfaces, prefer the original full-resolution screenshots when available.
+For Devpost and other presentation surfaces, these PNGs can be reused directly.

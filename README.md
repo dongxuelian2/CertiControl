@@ -14,23 +14,23 @@ CertiControl is a certificate-based toolkit for continuous-time finite-dimension
 
 ### System overview
 
-![CertiControl system overview](docs/images/overview.webp)
+![CertiControl system overview](docs/images/overview.png)
 
 *Four-part Kalman example: a 4-state system containing one state in each controllable/observable structural class. CertiControl reports both high-level certificate status and the resulting `1 / 1 / 1 / 1` decomposition.*
 
 ### LQR / CARE certificate
 
-![CertiControl LQR certificate](docs/images/lqr.webp)
+![CertiControl LQR certificate](docs/images/lqr.png)
 
 *LQR certificate for an unstable but controllable system. CertiControl checks Q/R validity, stabilizability and detectability, CARE residuals, and verifies that the closed-loop poles lie in the left half-plane.*
 
 ### Kalman structural decomposition
 
-![CertiControl Kalman structural decomposition](docs/images/kalman.webp)
+![CertiControl Kalman structural decomposition](docs/images/kalman.png)
 
 *Full Kalman structural decomposition with reachable/unobservable dimensions, transformation conditioning, and all four structural components identified explicitly.*
 
-The screenshots above are real captures from the running Streamlit application; repository copies are resized/compressed for fast README rendering.
+The screenshots above are full-resolution real captures from the running Streamlit application.
 
 ## Why CertiControl?
 
