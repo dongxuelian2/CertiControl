@@ -1,0 +1,111 @@
+name: Capture demo screenshots
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/capture-screenshots.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install CertiControl app and Playwright
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[app]" playwright
+          python -m playwright install --with-deps chromium
+
+      - name: Start Streamlit
+        run: |
+          nohup python -m streamlit run app.py             --server.headless true             --server.address 127.0.0.1             --server.port 8501             >/tmp/streamlit.log 2>&1 &
+          for i in {1..60}; do
+            if curl -fsS http://127.0.0.1:8501/_stcore/health >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/streamlit.log
+          exit 1
+
+      - name: Capture real UI screenshots
+        run: python .github/scripts/capture_screenshots.py
+
+      - name: Switch README to high-resolution PNG screenshots
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          readme = Path("README.md")
+          text = readme.read_text(encoding="utf-8")
+          text = text.replace("docs/images/overview.webp", "docs/images/overview.png")
+          text = text.replace("docs/images/lqr.webp", "docs/images/lqr.png")
+          text = text.replace("docs/images/kalman.webp", "docs/images/kalman.png")
+          text = text.replace(
+              "The screenshots above are real captures from the running Streamlit application; repository copies are resized/compressed for fast README rendering.",
+              "The screenshots above are full-resolution real captures from the running Streamlit application.",
+          )
+          readme.write_text(text, encoding="utf-8")
+
+          manifest = Path("docs/images/README.md")
+          manifest.write_text(
+              """# Screenshot Assets
+
+This directory contains **real screenshots captured from the running CertiControl Streamlit application**.
+
+Current assets:
+
+- `overview.png` — full-resolution Overview/status screen using the four-part Kalman example.
+- `lqr.png` — full-resolution LQR certificate and open/closed-loop pole comparison.
+- `kalman.png` — full-resolution four-part Kalman structural decomposition.
+- `stability.png` — optional future/Devpost stability capture if committed later.
+
+The PNG files are direct browser screenshots of the real Streamlit UI; they are not generated UI mockups.
+
+For Devpost and other presentation surfaces, these PNGs can be reused directly.
+""",
+              encoding="utf-8",
+          )
+          PY
+          rm -f docs/images/*.webp
+
+      - name: Verify screenshot dimensions
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+
+          for name in ("overview.png", "lqr.png", "kalman.png"):
+              path = Path("docs/images") / name
+              with Image.open(path) as image:
+                  width, height = image.size
+              print(f"{name}: {width}x{height}, {path.stat().st_size} bytes")
+              if width < 1600 or height < 800:
+                  raise SystemExit(f"{name} is unexpectedly small")
+          PY
+
+      - name: Commit high-resolution screenshots
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md docs/images
+          if git diff --cached --quiet; then
+            echo "No screenshot changes to commit."
+            exit 0
+          fi
+          git commit -m "docs: replace compressed screenshots with high-resolution captures"
+          git push
