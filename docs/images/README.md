@@ -9,6 +9,6 @@ Repository-optimized assets:
 - `kalman.webp` — four-part Kalman structural decomposition.
 - `stability.png` — optional future/Devpost stability capture if a full-resolution copy is committed later.
 
-The WebP files are resized/compressed copies of the real browser captures for faster README rendering; they are not generated UI mockups.
+The WebP files are resized/compressed copies of the real browser captures for faster README rendering. Do not commit generated UI mockups as if they were screenshots of the real application.
 
 For Devpost or other presentation surfaces, prefer the original full-resolution screenshots when available.
