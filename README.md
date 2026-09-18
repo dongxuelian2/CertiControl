@@ -10,7 +10,27 @@ CertiControl is a certificate-based toolkit for continuous-time finite-dimension
 **Interactive app:** run locally with `streamlit run app.py`  
 **Release candidate:** `0.2.0`
 
-> Screenshots are intentionally not embedded until they are captured from a real running app. The capture plan is tracked in [`docs/SUBMISSION_CHECKLIST.md`](docs/SUBMISSION_CHECKLIST.md).
+## Demo screenshots
+
+### System overview
+
+![CertiControl system overview](docs/images/overview.webp)
+
+*Four-part Kalman example: a 4-state system containing one state in each controllable/observable structural class. CertiControl reports both high-level certificate status and the resulting `1 / 1 / 1 / 1` decomposition.*
+
+### LQR / CARE certificate
+
+![CertiControl LQR certificate](docs/images/lqr.webp)
+
+*LQR certificate for an unstable but controllable system. CertiControl checks Q/R validity, stabilizability and detectability, CARE residuals, and verifies that the closed-loop poles lie in the left half-plane.*
+
+### Kalman structural decomposition
+
+![CertiControl Kalman structural decomposition](docs/images/kalman.webp)
+
+*Full Kalman structural decomposition with reachable/unobservable dimensions, transformation conditioning, and all four structural components identified explicitly.*
+
+The screenshots above are real captures from the running Streamlit application; repository copies are resized/compressed for fast README rendering.
 
 ## Why CertiControl?
 
