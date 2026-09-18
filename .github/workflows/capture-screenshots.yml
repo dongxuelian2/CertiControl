@@ -1,4 +1,5 @@
 name: Capture demo screenshots
+# capture revision 2
 
 on:
   workflow_dispatch:
