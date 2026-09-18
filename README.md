@@ -7,7 +7,8 @@
 CertiControl is a certificate-based toolkit for continuous-time finite-dimensional LTI systems. It exposes the mathematical evidence behind controllability, observability, stability, LQR synthesis, and Kalman structural decomposition instead of returning only final Boolean or matrix-valued answers.
 
 **Repository:** https://github.com/dongxuelian2/CertiControl  
-**Interactive app:** run locally with `streamlit run app.py`  
+**Live demo:** https://certicontrol.streamlit.app/  
+**Run locally:** `streamlit run app.py`  
 **Release candidate:** `0.2.0`
 
 ## Demo screenshots
@@ -60,6 +61,8 @@ The project does not claim new control theory. Its contribution is a certificate
 The unified analysis layer also exposes explicit `PASS`, `FAIL`, `INCONCLUSIVE`, `NOT_RUN`, and `ERROR` states rather than conflating missing input with failure.
 
 ## Interactive demo
+
+**Try CertiControl online:** https://certicontrol.streamlit.app/
 
 The Streamlit app provides seven deterministic examples and tabs for Overview, Controllability, Observability, Stability, LQR, Kalman Structure, and Export.
 
